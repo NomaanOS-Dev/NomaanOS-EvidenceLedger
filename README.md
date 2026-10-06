@@ -1,3 +1,6 @@
+[![Evidence Ledger](https://img.shields.io/badge/Evidence%20Ledger-Tamper--Proof-blue.svg?style=for-the-badge&logo=shield)](https://github.com/NomaanOS-Dev/NomaanOS-EvidenceLedger)
+[![Verification](https://img.shields.io/badge/Disk%20Data-PASSED-brightgreen.svg?style=for-the-badge)](https://github.com/NomaanOS-Dev/NomaanOS-EvidenceLedger)
+
 # 🔒 NomaanOS EvidenceLedger — Tamper-Proof Cryptographic Audit Store
 > **An immutable, append-only security ledger that creates mathematically verifiable audit trails for system events, AI inference logs, and security alerts.**
 
