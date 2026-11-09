@@ -1,47 +1,44 @@
-import json
+﻿import json
 import os
 from ledger import EvidenceLedger
 
+
+class LedgerIntegrityError(SecurityError if "SecurityError" in globals() else RuntimeError):
+    """Raised when on-disk ledger cryptographic verification fails."""
+    pass
+
+
 class PersistentEvidenceLedger(EvidenceLedger):
-    def __init__(self, storage_path="evidence_store.jsonl"):
+    def __init__(self, storage_path: str = "evidence_store.jsonl", auto_verify: bool = True):
         super().__init__()
         self.storage_path = os.path.expanduser(storage_path)
         self._load_from_disk()
+        if auto_verify and not self.verify_chain():
+            self._chain.clear()
+            raise LedgerIntegrityError(
+                f"[CRITICAL] Ledger integrity invariant violated in '{self.storage_path}'. "
+                "Cold storage hash-chain mismatch detected."
+            )
 
-    def _load_from_disk(self):
+    def _load_from_disk(self) -> None:
         if not os.path.exists(self.storage_path):
             return
         with open(self.storage_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    record_dict = json.loads(line)
-                    # Existing internal chain list me dict append karein
+            for line_no, line in enumerate(f, start=1):
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                try:
+                    record_dict = json.loads(clean_line)
                     self._chain.append(record_dict)
+                except json.JSONDecodeError as err:
+                    raise LedgerIntegrityError(
+                        f"Malformed JSON at line {line_no} in '{self.storage_path}': {err}"
+                    )
 
-    def record_evidence(self, evidence_type: str, payload_hash: str):
-        record_dict = super().record_evidence(evidence_type, payload_hash)
+    def record_evidence(self, artifact_name: str, payload_hash: str):
+        record_dict = super().record_evidence(artifact_name, payload_hash)
         with self._lock:
             with open(self.storage_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(record_dict) + "\n")
+                f.write(json.dumps(record_dict, sort_keys=True) + "\n")
         return record_dict
-
-if __name__ == "__main__":
-    test_file = "test_evidence.jsonl"
-    if os.path.exists(test_file):
-        os.remove(test_file)
-
-    # 1. First run - record entry
-    db = PersistentEvidenceLedger(test_file)
-    rec = db.record_evidence("boot_event", "a" * 64)
-    print(f"[+] Persisted Record #{rec['index']} with hash {rec['current_hash'][:16]}...")
-    
-    # 2. Second instance - reload from disk & verify
-    db_reloaded = PersistentEvidenceLedger(test_file)
-    print(f"[+] Reloaded Chain Length: {len(db_reloaded._chain)}")
-    valid = db_reloaded.verify_chain()
-    print(f"[+] Verification on Reloaded Disk Data: {'PASSED ✅' if valid else 'FAILED ❌'}")
-
-    # Cleanup
-    if os.path.exists(test_file):
-        os.remove(test_file)
